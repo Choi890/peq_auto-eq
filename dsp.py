@@ -78,7 +78,8 @@ def peq_sum_response_db(freqs, fs, bands):
     bands: list of (f0, Q, gain_db)
     Returns total magnitude response in dB across given freqs.
     """
-    # Multiply each biquad response so the optimizer sees the same cascade that rendering applies.
+    # 각 PEQ biquad의 주파수 응답을 곱해 전체 캐스케이드 응답을 계산한다.
+    # 최적화 단계에서 보는 응답과 실제 오디오에 적용되는 필터 구조가 같아야 예측과 결과가 맞는다.
     # We'll compute response on a dense grid using freqz at those freqs
     w = 2*np.pi*freqs/fs
     H = np.ones_like(w, dtype=np.complex128)
@@ -149,7 +150,8 @@ def apply_peq_to_audio(x, fs, bands, preamp_db=-3.0):
     Applies preamp then cascade PEQ.
     Returns float64 audio.
     """
-    # Apply preamp before EQ so positive filters have headroom before the final soft limiter.
+    # PEQ 부스트가 걸리기 전에 preamp로 전체 레벨을 낮춘다.
+    # 이렇게 해야 고역/저역을 올리는 필터가 클리핑을 만들 가능성을 줄일 수 있다.
     pre = 10 ** (preamp_db / 20.0)
     y = x.astype(np.float64) * pre
 
@@ -175,7 +177,8 @@ def smooth_mag_db_octave(freqs, mag_db, frac_oct=6):
     Simple log-frequency moving average smoothing.
     frac_oct=6 means ~1/6 octave smoothing.
     """
-    # Log-frequency smoothing prevents the solver from chasing narrow notes instead of mix balance.
+    # 음악 스펙트럼에는 특정 음정 때문에 좁고 큰 피크가 생긴다.
+    # 로그 주파수 기준으로 smoothing해서, 최적화기가 개별 음정보다 전체 밸런스를 맞추도록 한다.
     f = freqs.copy()
     y = mag_db.copy()
     out = np.empty_like(y)

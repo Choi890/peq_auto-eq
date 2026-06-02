@@ -42,7 +42,8 @@ def find_ffmpeg() -> Optional[str]:
     return None
 
 def decode_to_temp_wav(input_path: str, target_sr: int = 48000) -> str:
-    # Convert compressed inputs through ffmpeg so the analysis and full render use one PCM path.
+    # 압축 음원은 ffmpeg로 임시 WAV로 변환해 분석과 렌더링 입력 형식을 통일한다.
+    # Python 오디오 라이브러리가 파일 포맷마다 다르게 동작하는 문제를 줄이기 위한 전처리다.
     ffmpeg_path = find_ffmpeg()
     if not ffmpeg_path:
         raise RuntimeError(
@@ -94,7 +95,8 @@ def main():
     tmp_path = None
 
     try:
-        # FLAC is normalized through ffmpeg first to avoid backend differences across platforms.
+        # FLAC은 환경마다 디코더 결과가 달라질 수 있어 먼저 ffmpeg로 표준 PCM WAV를 만든다.
+        # 이후 분석과 EQ 적용은 변환된 파일을 사용한다.
         # (3번) FLAC이면 무조건 ffmpeg로 임시 WAV 생성 후 처리 (환경 차이 제거)
         if os.path.splitext(in_path)[1].lower() == ".flac":
             tmp_path = decode_to_temp_wav(in_path, target_sr=48000)
@@ -124,7 +126,8 @@ def main():
 
         # 4) Fit gains only
         def residual(gains):
-            # The optimizer changes band gains while fixed centers/Q keep the EQ musical and stable.
+            # 최적화기는 각 밴드의 gain만 바꾼다.
+            # center frequency와 Q를 고정해 과하게 날카로운 보정이 생기지 않도록 한다.
             bands = [(float(fc), Q, float(g)) for fc, g in zip(centers, gains)]
             eq_db = peq_sum_response_db(f, fs, bands)
             after = y_s + eq_db
@@ -165,7 +168,8 @@ def main():
         print(f"Saved plot: {plot_path}")
 
         # 7) Apply EQ to original audio (keep stereo)
-        # Analysis is mono for robustness, but rendering preserves the original channel layout.
+        # 스펙트럼 분석은 안정성을 위해 mono 합성 신호로 수행한다.
+        # 하지만 실제 EQ 적용은 원본 스테레오/채널 구조를 유지한 채 채널별로 필터를 건다.
         x_full, fs2 = load_audio(in_path)
         if fs2 != fs:
             raise RuntimeError(f"Sample rate mismatch: analysis fs={fs}, full fs={fs2}")
