@@ -78,6 +78,7 @@ def peq_sum_response_db(freqs, fs, bands):
     bands: list of (f0, Q, gain_db)
     Returns total magnitude response in dB across given freqs.
     """
+    # Multiply each biquad response so the optimizer sees the same cascade that rendering applies.
     # We'll compute response on a dense grid using freqz at those freqs
     w = 2*np.pi*freqs/fs
     H = np.ones_like(w, dtype=np.complex128)
@@ -148,6 +149,7 @@ def apply_peq_to_audio(x, fs, bands, preamp_db=-3.0):
     Applies preamp then cascade PEQ.
     Returns float64 audio.
     """
+    # Apply preamp before EQ so positive filters have headroom before the final soft limiter.
     pre = 10 ** (preamp_db / 20.0)
     y = x.astype(np.float64) * pre
 
@@ -173,6 +175,7 @@ def smooth_mag_db_octave(freqs, mag_db, frac_oct=6):
     Simple log-frequency moving average smoothing.
     frac_oct=6 means ~1/6 octave smoothing.
     """
+    # Log-frequency smoothing prevents the solver from chasing narrow notes instead of mix balance.
     f = freqs.copy()
     y = mag_db.copy()
     out = np.empty_like(y)

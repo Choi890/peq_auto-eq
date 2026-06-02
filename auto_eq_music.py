@@ -42,6 +42,7 @@ def find_ffmpeg() -> Optional[str]:
     return None
 
 def decode_to_temp_wav(input_path: str, target_sr: int = 48000) -> str:
+    # Convert compressed inputs through ffmpeg so the analysis and full render use one PCM path.
     ffmpeg_path = find_ffmpeg()
     if not ffmpeg_path:
         raise RuntimeError(
@@ -93,6 +94,7 @@ def main():
     tmp_path = None
 
     try:
+        # FLAC is normalized through ffmpeg first to avoid backend differences across platforms.
         # (3번) FLAC이면 무조건 ffmpeg로 임시 WAV 생성 후 처리 (환경 차이 제거)
         if os.path.splitext(in_path)[1].lower() == ".flac":
             tmp_path = decode_to_temp_wav(in_path, target_sr=48000)
@@ -122,6 +124,7 @@ def main():
 
         # 4) Fit gains only
         def residual(gains):
+            # The optimizer changes band gains while fixed centers/Q keep the EQ musical and stable.
             bands = [(float(fc), Q, float(g)) for fc, g in zip(centers, gains)]
             eq_db = peq_sum_response_db(f, fs, bands)
             after = y_s + eq_db
@@ -162,6 +165,7 @@ def main():
         print(f"Saved plot: {plot_path}")
 
         # 7) Apply EQ to original audio (keep stereo)
+        # Analysis is mono for robustness, but rendering preserves the original channel layout.
         x_full, fs2 = load_audio(in_path)
         if fs2 != fs:
             raise RuntimeError(f"Sample rate mismatch: analysis fs={fs}, full fs={fs2}")
